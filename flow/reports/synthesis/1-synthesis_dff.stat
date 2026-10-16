@@ -1,0 +1,25 @@
+
+59. Printing statistics.
+
+=== axi4_pcie6_bridge_top ===
+
+   Number of wires:              17861
+   Number of wire bits:          24191
+   Number of public wires:          53
+   Number of public wire bits:    6353
+   Number of memories:               0
+   Number of memory bits:            0
+   Number of processes:              0
+   Number of cells:              23001
+     $_ANDNOT_                     292
+     $_AND_                        667
+     $_MUX_                      10788
+     $_NAND_                        44
+     $_NOR_                        132
+     $_NOT_                        150
+     $_ORNOT_                        4
+     $_OR_                         141
+     $_XNOR_                      1659
+     $_XOR_                       4780
+     sky130_fd_sc_hd__dfxtp_2     4344
+
