@@ -6,7 +6,7 @@
 [![Flow](https://img.shields.io/badge/Physical%20Design-OpenLane%20%2F%20OpenROAD-purple.svg)](flow/)
 [![PCIe](https://img.shields.io/badge/PCIe-Gen%206%20(PAM4%20%2B%20256B%20FLIT)-orange.svg)](rtl/)
 [![Regression](https://img.shields.io/badge/Regression-6%2F6%20Passed%20(100%25)-brightgreen.svg)](sim/)
-[![Judge-Suite](https://img.shields.io/badge/Judge%20Stress%20Suite-8%2F8%20Passed%20(100%25)-brightgreen.svg)](judge_eval_suite/)
+[![Extra-Testbenches](https://img.shields.io/badge/Extra%20Testbenches-8%2F8%20Passed%20(100%25)-brightgreen.svg)](extra_testbenches/)
 [![DRC](https://img.shields.io/badge/Magic%20DRC-0%20Violations%20(Clean)-success.svg)](flow/reports/)
 
 A synthesizable, high-throughput **AXI4-Stream to PCIe Gen 6 Protocol Bridge** designed from RTL specification down to a tapeout-clean **GDSII silicon layout**. 
@@ -173,7 +173,7 @@ AXI4_to_PCIe6_Stream/
 │   ├── tb_workload_ml.v                # ML inference accelerator tensor stream bursts
 │   ├── tb_fault_tolerance.v            # In-flight PAM4 bit-flip repair & reset recovery
 │   └── tb_bridge_complete.v            # Full end-to-end integration testbench
-├── judge_eval_suite/                   # Official Judge Stress & Boundary Test Suite
+├── extra_testbenches/                  # 8 Extra Stress & Boundary Testbenches
 │   ├── tb_judge_stress_contention.v    # Concurrent dual-port line-rate contention
 │   ├── tb_judge_backpressure_torture.v # Pathological backpressure & skid buffer torture
 │   ├── tb_judge_pam4_fec_matrix.v      # Multi-lane PAM4 noise & SEC-DED FEC matrix
@@ -182,7 +182,7 @@ AXI4_to_PCIe6_Stream/
 │   ├── tb_break_partial_tkeep.v        # Boundary: Unaligned partial TKEEP handling
 │   ├── tb_break_head_of_line_blocking.v# Boundary: Arbiter lock under stalled master
 │   ├── tb_break_burst_noise_packet_loss.v # Boundary: Multi-bit PAM4 burst noise squelch
-│   └── run_judge_suite.py              # Master runner for all 8 judge tests
+│   └── run_extra_tests.py              # Master runner for all 8 extra tests
 ├── prototypes/                         # Sub-block prototypes & legacy testing blocks
 ├── flow/                               # Physical Design (RTL-to-GDSII)
 │   ├── config.json                     # OpenLane physical design configuration
@@ -196,8 +196,7 @@ AXI4_to_PCIe6_Stream/
 ├── scripts/
 │   ├── gen_crc.py                      # Parallel CRC generator & GF(2) Galois matrix solver
 │   └── run_all_tests.py                # Master regression test runner
-├── axi4_pcie6_bridge_top.gds           # Final 90 MB Tapeout GDSII File
-└── SARCATHON_PCIe6_Master_Study_Guide.md # Comprehensive Technical & Interview Guide
+└── axi4_pcie6_bridge_top.gds           # Final 90 MB Tapeout GDSII File
 ```
 
 ---
@@ -210,9 +209,9 @@ Requires Icarus Verilog (`iverilog`) and Python 3:
 python scripts/run_all_tests.py
 ```
 
-### 2. Run Official Judge Stress & Boundary Regression (8 Testbenches)
+### 2. Run Extra Stress & Boundary Testbenches (8 Tests)
 ```bash
-python judge_eval_suite/run_judge_suite.py
+python extra_testbenches/run_extra_tests.py
 ```
 
 To run individual testbenches:
