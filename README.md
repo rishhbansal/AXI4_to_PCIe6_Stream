@@ -183,7 +183,7 @@ AXI4_to_PCIe6_Stream/
 │   ├── tb_break_head_of_line_blocking.v# Boundary: Arbiter lock under stalled master
 │   ├── tb_break_burst_noise_packet_loss.v # Boundary: Multi-bit PAM4 burst noise squelch
 │   └── run_extra_tests.py              # Master runner for all 8 extra tests
-├── prototypes/                         # Sub-block prototypes & legacy testing blocks
+├── prototypes/                         # Sub-block prototypes & legacy testing blocks (not part of rtl and not considered under rtl to gdsII)
 ├── flow/                               # Physical Design (RTL-to-GDSII)
 │   ├── config.json                     # OpenLane physical design configuration
 │   ├── constraints.sdc                 # Synopsys Design Constraints (SDC)
