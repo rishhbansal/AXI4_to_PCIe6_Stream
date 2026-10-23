@@ -71,7 +71,7 @@ module pcie6_flit_depacketizer #(
         rx_flit_buf[1791:0]
     };
 
-    wire        rec_src      = corrected_flit[32];
+    wire        rec_src      = corrected_flit[31];
     wire [15:0] rec_flit_seq = corrected_flit[15:0];
     wire [31:0] rec_crc      = corrected_flit[2047:2016];
 
@@ -124,7 +124,12 @@ module pcie6_flit_depacketizer #(
                         end
                     end
 
-                    if (!m_axis_tvalid || m_axis_tready) begin
+                    // Inline Error Squelch: If fatal uncorrectable corruption, kill downstream transmission
+                    if (chunk_fatal) begin
+                        m_axis_tvalid <= 1'b0;
+                        tx_beat_cnt   <= 2'd0;
+                        state         <= S_RX_FLIT;
+                    end else if (!m_axis_tvalid || m_axis_tready) begin
                         m_axis_tvalid <= 1'b1;
                         m_axis_tkeep  <= {OUT_KEEP_W{1'b1}};
                         m_axis_tsrc   <= rec_src;

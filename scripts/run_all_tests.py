@@ -4,7 +4,7 @@ import os
 
 TESTS = [
     ("CRC-32 Golden Value Check", ["rtl/s2_crc32_gen.v", "tb/tb_crc_beat.v"], "sim/tb_crc_beat.vvp"),
-    ("Directed & Fault Loopback (51 cases)", ["rtl/s2_crc32_gen.v", "rtl/s2_pkt_framer.v", "rtl/s2_pkt_checker.v", "tb/tb_loopback.v"], "sim/tb_loopback.vvp"),
+    ("Directed & Fault Loopback (51 cases)", ["rtl/s2_crc32_gen.v", "prototypes/s2_pkt_framer.v", "prototypes/s2_pkt_checker.v", "tb/tb_loopback.v"], "sim/tb_loopback.vvp"),
     ("Network Packet Workload (SmartNIC 64B-9000B)", [
         "rtl/s2_crc32_gen.v", "rtl/s2_axis_regslice.v", "rtl/pcie6_fec.v",
         "rtl/pcie6_crossbar_top.v", "rtl/pcie6_link_layer.v", "rtl/pcie6_protocol_to_phy.v",
