@@ -6,6 +6,7 @@
 [![Flow](https://img.shields.io/badge/Physical%20Design-OpenLane%20%2F%20OpenROAD-purple.svg)](flow/)
 [![PCIe](https://img.shields.io/badge/PCIe-Gen%206%20(PAM4%20%2B%20256B%20FLIT)-orange.svg)](rtl/)
 [![Regression](https://img.shields.io/badge/Regression-6%2F6%20Passed%20(100%25)-brightgreen.svg)](sim/)
+[![Judge-Suite](https://img.shields.io/badge/Judge%20Stress%20Suite-8%2F8%20Passed%20(100%25)-brightgreen.svg)](judge_eval_suite/)
 [![DRC](https://img.shields.io/badge/Magic%20DRC-0%20Violations%20(Clean)-success.svg)](flow/reports/)
 
 A synthesizable, high-throughput **AXI4-Stream to PCIe Gen 6 Protocol Bridge** designed from RTL specification down to a tapeout-clean **GDSII silicon layout**. 
@@ -59,20 +60,23 @@ The architecture directly implements the 3-tier pipeline specified in the SARCAT
 - **Output**: 512-bit Raw Internal Parallel Bus with source routing tags.
 
 #### 2. Link Layer (`pcie6_link_layer.v` & `pcie6_fec.v`)
-- **Fixed 256-Byte FLIT Packaging**: In accordance with the PCIe Gen 6 standard, packets are packaged into uniform 2048-bit (256-Byte) Flow Information Units (FLITs) over 4 beats ($4 \times 64\text{ B} = 256\text{ B}$).
-- **Single-Cycle Parallel CRC-32**: Serial CRC requires 512 clock cycles per beat. Leveraging the linearity of CRC over Galois Field $\text{GF}(2)$, we implemented a static parallel XOR tree (depth $\le 6$ gates) that ingests all 64 bytes and updates the 32-bit CRC state on the exact same clock edge.
-- **Forward Error Correction (FEC)**: PAM4 modulation carries a $-9.5\text{ dB}$ SNR penalty compared to NRZ, degrading raw BER. To prevent continuous retransmissions, we implemented an interleaved **SEC-DED (Single Error Correction, Double Error Detection)** Hamming matrix code to correct bit-flips in-flight.
+- **Fixed 256-Byte FLIT Packaging**: In accordance with the PCIe Gen 6 standard, packets are packaged into uniform 2048-bit (256-Byte) Flow Information Units (FLITs) over 4 beats (4 × 64 B = 256 B).
+- **Single-Cycle Parallel CRC-32**: Serial CRC requires 512 clock cycles per beat. Leveraging the linearity of CRC over Galois Field GF(2), we implemented a static parallel XOR tree (depth ≤ 6 gates) that ingests all 64 bytes and updates the 32-bit CRC state on the exact same clock edge.
+- **Forward Error Correction (FEC)**: PAM4 modulation carries a -9.5 dB SNR penalty compared to NRZ, degrading raw BER. To prevent continuous retransmissions, we implemented an interleaved **SEC-DED (Single Error Correction, Double Error Detection)** Hamming matrix code to correct bit-flips in-flight.
 - **Bus Width Conversion**: Serializes the 2048-bit FLIT onto a System-Synchronous 256-bit bus across 8 clock cycles.
 
 #### 3. Protocol-to-PHY Layer (`pcie6_protocol_to_phy.v`)
 - **Multi-Lane Striping**: Distributes the 256-bit bus round-robin across 4 physical SerDes lanes (8 bytes / 64 bits per lane per clock).
 - **Gray-Coded PAM4 Mapping**: Maps 2-bit dibits to 4 voltage levels:
-  $$\text{2'b00} \rightarrow \text{Level 0 } (-3\text{V}) \quad \vert \quad \text{2'b01} \rightarrow \text{Level 1 } (-1\text{V})$$
-  $$\text{2'b11} \rightarrow \text{Level 2 } (+1\text{V}) \quad \vert \quad \text{2'b10} \rightarrow \text{Level 3 } (+3\text{V})$$
-  Adjacent levels differ by only **1 bit** (Hamming distance = 1). An analog $\pm 1$ level shift due to channel noise causes at most a 1-bit error, ensuring it remains fully within the correction budget of the SEC-DED FEC engine.
+  - `2'b00` → Level 0 (-3V)
+  - `2'b01` → Level 1 (-1V)
+  - `2'b11` → Level 2 (+1V)
+  - `2'b10` → Level 3 (+3V)
+  
+  Adjacent levels differ by only **1 bit** (Hamming distance = 1). An analog ±1 level shift due to channel noise causes at most a 1-bit error, ensuring it remains fully within the correction budget of the SEC-DED FEC engine.
 
 #### 4. Closed-Loop Verification Subsystem (`pcie6_phy_to_protocol.v`, `pcie6_flit_depacketizer.v`)
-- Serves as the golden reference receiver: performs Gray de-mapping, 4-lane de-striping, FLIT reassembly, real-time FEC syndrome decoding, in-flight single-bit repair, CRC verification, and AXI packet reconstruction.
+- Serves as the golden reference receiver: performs Gray de-mapping, 4-lane de-striping, FLIT reassembly, real-time FEC syndrome decoding, in-flight single-bit repair, inline fatal error squelching, CRC verification, and AXI packet reconstruction.
 
 ---
 
@@ -117,9 +121,9 @@ Verification was conducted via automated, self-checking SystemVerilog testbenche
    - High-bandwidth continuous streaming of INT8/FP16 tensor weight layers (1 KB, 2 KB, 4 KB bursts).
    - Injected **25% randomized downstream backpressure** stalls; verified zero buffer overflows or dropped beats across 7,168 bytes (28 FLITs).
 3. **Channel Fault Tolerance (`tb/tb_fault_tolerance.v`)**:
-   - Injected single-bit errors into active PAM4 symbol lanes $\rightarrow$ FEC detected syndrome, corrected the bit in-flight (`fec_corrected == 1`), and FLIT CRC passed with 0 payload loss.
-   - Injected multi-bit fatal errors $\rightarrow$ flagged uncorrectable error (`fec_fatal == 1`) and rejected packet.
-   - Triggered mid-stream asynchronous reset $\rightarrow$ verified clean recovery without state machine lockup.
+   - Injected single-bit errors into active PAM4 symbol lanes → FEC detected syndrome, corrected the bit in-flight (`fec_corrected == 1`), and FLIT CRC passed with 0 payload loss.
+   - Injected multi-bit fatal errors → flagged uncorrectable error (`fec_fatal == 1`), activated inline hardware squelch, and rejected packet.
+   - Triggered mid-stream asynchronous reset → verified clean recovery without state machine lockup.
 
 ---
 
@@ -130,13 +134,13 @@ The top-level bridge (`axi4_pcie6_bridge_top`) was physically implemented throug
 | Design Metric | Value | Significance |
 |---|---|---|
 | **Technology Node** | SkyWater 130nm (`sky130A`) | Open-source manufacturable foundry PDK |
-| **Die Dimensions** | $1500 \times 1500\,\mu\text{m}$ ($2.25\text{ mm}^2$) | Absolute sizing providing $6,000\,\mu\text{m}$ perimeter |
+| **Die Dimensions** | 1500 × 1500 µm (2.25 mm²) | Absolute sizing providing 6,000 µm perimeter |
 | **Physical I/O Pins** | **1,420 pins** | Dual 512-bit data + keeps + SerDes lanes |
-| **Core Area** | $1470 \times 1470\,\mu\text{m}$ ($0.303\text{ mm}^2$ logic) | Clean power ring margins |
+| **Core Area** | 1470 × 1470 µm (0.303 mm² logic) | Clean power ring margins |
 | **Total Standard Cells** | **24,708 cells** | Gate-level logic mapping |
 | **Sequential Flip-Flops**| **4,344 registers (`dfxtp_2`)** | 512-bit crossbar, FLIT buffer, pipeline stages |
 | **Metal Routing Layers** | 5 Layers (`met1` to `met5`) | Detailed routing via TritonRoute |
-| **Clock Tree Target** | Balanced H-Tree (TritonCTS) | Clock skew $< 100\text{ ps}$ |
+| **Clock Tree Target** | Balanced H-Tree (TritonCTS) | Clock skew < 100 ps |
 | **Magic DRC Signoff** | **`COUNT: 0` (Clean)** | **Zero design rule violations** |
 | **Final GDSII Size** | **90.01 MB** (`axi4_pcie6_bridge_top.gds`) | Tapeout-ready mask layout |
 
@@ -153,7 +157,7 @@ Open `axi4_pcie6_bridge_top.gds` in KLayout to inspect the full die:
 ```
 AXI4_to_PCIe6_Stream/
 ├── rtl/                                # Synthesizable Verilog RTL
-│   ├── axi4_pcie6_bridge_top.v         # Master Top-Level Bridge
+│   ├── axi4_pcie6_bridge_top.v         # Master Top-Level Bridge (GDSII Top)
 │   ├── pcie6_crossbar_top.v            # Dual 512-bit crossbar & dynamic arbiter
 │   ├── s2_axis_regslice.v              # 2-slot decoupled skid buffer
 │   ├── pcie6_link_layer.v              # 256-Byte FLIT packetizer & framing engine
@@ -161,7 +165,7 @@ AXI4_to_PCIe6_Stream/
 │   ├── pcie6_fec.v                     # SEC-DED Hamming Forward Error Correction
 │   ├── pcie6_protocol_to_phy.v         # 4-lane striping, Gray coding & PAM4 mapping
 │   ├── pcie6_phy_to_protocol.v         # Golden RX: PAM4 de-mapping & de-striping
-│   └── pcie6_flit_depacketizer.v       # Golden RX: FLIT unpacker, in-flight FEC repair
+│   └── pcie6_flit_depacketizer.v       # Golden RX: FLIT unpacker, in-flight FEC repair & squelch
 ├── tb/                                 # Verification Testbenches
 │   ├── tb_crc_beat.v                   # Unit test: IEEE 802.3 check vector (0xCBF43926)
 │   ├── tb_loopback.v                   # Directed & randomized loopback (51 test cases)
@@ -179,6 +183,7 @@ AXI4_to_PCIe6_Stream/
 │   ├── tb_break_head_of_line_blocking.v# Boundary: Arbiter lock under stalled master
 │   ├── tb_break_burst_noise_packet_loss.v # Boundary: Multi-bit PAM4 burst noise squelch
 │   └── run_judge_suite.py              # Master runner for all 8 judge tests
+├── prototypes/                         # Sub-block prototypes & legacy testing blocks
 ├── flow/                               # Physical Design (RTL-to-GDSII)
 │   ├── config.json                     # OpenLane physical design configuration
 │   ├── constraints.sdc                 # Synopsys Design Constraints (SDC)
@@ -225,7 +230,7 @@ iverilog -g2005 -o sim/tb_workload_ml.vvp rtl/*.v tb/tb_workload_ml.v
 vvp sim/tb_workload_ml.vvp
 ```
 
-### 2. Run Physical Design to GDSII (OpenLane)
+### 3. Run Physical Design to GDSII (OpenLane)
 Inside Docker / WSL with OpenLane installed:
 ```bash
 cd ~/OpenLane
@@ -246,10 +251,10 @@ While implemented on SkyWater 130nm to achieve zero DRC errors on open-source si
 | Parameter | SkyWater 130nm (Implemented) | 15nm FinFET (`nangate15` / FreePDK15) |
 |---|---|---|
 | **Transistor Architecture** | Planar Bulk CMOS | 3D FinFET |
-| **Operating Frequency** | $100\text{ MHz}$ ($10.0\text{ ns}$) | **$\ge 667\text{ MHz} - 1\text{ GHz}$ ($1.0\text{ ns}$)** |
-| **Logic Core Area** | $303,494\,\mu\text{m}^2$ ($0.303\text{ mm}^2$) | **$\approx 8,500\,\mu\text{m}^2$ ($>35\times$ area reduction)** |
-| **Die Footprint** | $1500 \times 1500\,\mu\text{m}$ | **$250 \times 250\,\mu\text{m}$** |
-| **Core Supply Voltage** | $1.8\text{ V}$ | **$0.75\text{ V} - 0.8\text{ V}$** |
+| **Operating Frequency** | 100 MHz (10.0 ns) | **≥ 667 MHz – 1 GHz (1.0 ns)** |
+| **Logic Core Area** | 303,494 µm² (0.303 mm²) | **~8,500 µm² (>35× area reduction)** |
+| **Die Footprint** | 1500 × 1500 µm | **250 × 250 µm** |
+| **Core Supply Voltage** | 1.8 V | **0.75 V – 0.8 V** |
 | **RTL Changes Needed** | None | **Zero RTL changes required** |
 
 ---
